@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Portal Cek Tagihan WiFi - Tagihan Wifi Proxy.net</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/img/icon.svg">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Cek Tagihan WiFi">
+  <link rel="apple-touch-icon" href="/img/icon.svg">
+  <style>
+    body {
+      background: #f8fafc;
+      min-height: 100vh;
+    }
+    .portal-container {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 24px 16px 60px 16px;
+    }
+    .portal-hero {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .portal-hero .brand-icon {
+      margin: 0 auto 12px auto;
+      width: 54px;
+      height: 54px;
+      font-size: 26px;
+    }
+    .portal-card {
+      background: white;
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      border: 1px solid var(--gray-200);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .search-box {
+      display: flex;
+      gap: 10px;
+    }
+    @media (max-width: 480px) {
+      .search-box {
+        flex-direction: column;
+      }
+    }
+    .invoice-card {
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      margin-bottom: 14px;
+      background: white;
+    }
+    .invoice-card.unpaid {
+      border-left: 4px solid var(--danger);
+      background: #fffafa;
+    }
+    .invoice-card.paid {
+      border-left: 4px solid var(--success);
+      background: #f0fdf4;
+    }
+    .bank-card {
+      background: #f1f5f9;
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13.5px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <div class="portal-container">
+    <div class="portal-hero">
+      <!-- PWA Install Prompt Banner di Portal Pelanggan (Selalu Terlihat) -->
+      <div id="pwa-install-banner" class="pwa-install-banner" style="display: flex; text-align: left; margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 24px;">📲</span>
+          <div>
+            <strong style="font-size: 13px;">Pasang Aplikasi Cek Tagihan di HP</strong>
+            <div style="font-size: 11px; opacity: 0.9;">Tinggal 1 klik dari layar utama HP Anda</div>
+          </div>
+        </div>
+        <button class="btn btn-sm" style="background: white; color: #2563eb; font-weight: 700; white-space: nowrap;" onclick="installPWA()">
+          📥 Pasang di HP
+        </button>
+      </div>
+
+      <div class="brand-icon">📡</div>
+      <h1 style="font-size: 24px; font-weight: 800; color: var(--gray-900);">Tagihan Wifi Proxy.net</h1>
+      <p style="font-size: 14px; color: var(--gray-500); margin-top: 4px;">Portal Resmi Cek & Pembayaran Tagihan Internet</p>
+      <div style="margin-top: 8px;">
+        <span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 12px; padding: 5px 12px;">
+          🔒 https://Tagihan.wifi.my.id
+        </span>
+      </div>
+    </div>
+
+    <!-- PENCARIAN TAGIHAN -->
+    <div class="portal-card">
+      <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--gray-800);">
+        🔍 Cek Tagihan Anda
+      </h3>
+      <p style="font-size: 13px; color: var(--gray-500); margin-bottom: 16px;">
+        Masukkan Kode Pelanggan (Contoh: <strong>PXY-001</strong>) atau Nomor WhatsApp Anda:
+      </p>
+      <form id="form-search" onsubmit="handleSearch(event)" class="search-box">
+        <input type="text" id="input-query" class="form-control" placeholder="Nomor Pelanggan atau No WhatsApp..." required style="font-size: 14px;">
+        <button type="submit" class="btn btn-primary" style="white-space: nowrap; padding: 10px 20px;">
+          🔎 Periksa Tagihan
+        </button>
+      </form>
+    </div>
+
+    <!-- HASIL PENCARIAN -->
+    <div id="result-area" style="display: none;">
+      <!-- Profil Pelanggan -->
+      <div class="portal-card" id="customer-profile-card">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <span class="badge badge-primary" style="background: #eff6ff; color: #1d4ed8; font-size: 12px;" id="res-code">PXY-001</span>
+            <h2 style="font-size: 20px; font-weight: 800; color: var(--gray-900); margin-top: 6px;" id="res-name">Nama Pelanggan</h2>
+            <p style="font-size: 13px; color: var(--gray-500);" id="res-address">Alamat Pemasangan</p>
+          </div>
+          <div style="text-align: right;">
+            <div id="res-status-badge"></div>
+            <div style="font-size: 12px; color: var(--gray-500); margin-top: 6px;" id="res-due">Jatuh Tempo: Tgl 10</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 16px; padding: 12px; background: var(--gray-50); border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 12px; color: var(--gray-500);">Paket Berlangganan:</div>
+            <strong id="res-package" style="font-size: 14px; color: var(--primary);">Paket Keluarga (20 Mbps)</strong>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 12px; color: var(--gray-500);">Tarif Bulanan:</div>
+            <strong id="res-price" style="font-size: 15px; color: var(--gray-900);">Rp 150.000</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- DAFTAR TAGIHAN -->
+      <div class="portal-card">
+        <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 16px; color: var(--gray-800);">
+          🧾 Tagihan & Riwayat Pembayaran
+        </h3>
+        <div id="invoices-list">
+          <!-- Diisi JS -->
+        </div>
+      </div>
+
+      <!-- CARA PEMBAYARAN & REKENING -->
+      <div class="portal-card">
+        <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--gray-800);">
+          💳 Metode Pembayaran Resmi
+        </h3>
+        <p style="font-size: 13px; color: var(--gray-500); margin-bottom: 14px;">
+          Silakan transfer ke salah satu rekening resmi Proxy.net di bawah ini:
+        </p>
+
+        <div class="bank-card">
+          <span id="bank-info-1">BCA: 1234567890 a.n Proxy.net Official</span>
+          <button class="btn btn-secondary btn-sm" onclick="copyText('bank-info-1')">Salin Rekening</button>
+        </div>
+
+        <div class="bank-card">
+          <span id="bank-info-2">Mandiri: 9876543210 a.n Proxy.net Official</span>
+          <button class="btn btn-secondary btn-sm" onclick="copyText('bank-info-2')">Salin Rekening</button>
+        </div>
+
+        <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: var(--radius-sm); padding: 12px 16px; margin-top: 14px; font-size: 13px; color: #065f46;">
+          <strong>📲 Konfirmasi Cepat via WhatsApp:</strong><br>
+          Setelah melakukan pembayaran, klik tombol <em>"Konfirmasi Pembayaran via WhatsApp"</em> di atas untuk verifikasi otomatis oleh sistem.
+        </div>
+      </div>
+
+      <!-- FORM LAPORAN GANGGUAN / TIKET -->
+      <div class="portal-card">
+        <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--gray-800);">
+          🛠️ Internet Bermasalah? Laporkan di Sini
+        </h3>
+        <p style="font-size: 13px; color: var(--gray-500); margin-bottom: 16px;">
+          Teknisi kami siap menangani kendala teknis internet Anda dengan cepat.
+        </p>
+        <form id="form-ticket" onsubmit="handleSubmitTicket(event)">
+          <div class="form-group">
+            <label class="form-label">Jenis Gangguan</label>
+            <select id="ticket-issue" class="form-control" required>
+              <option value="Lampu Modem LOS Merah">Lampu Modem LOS / PON Berkedip Merah</option>
+              <option value="Koneksi Internet Sangat Lambat">Koneksi Internet Sangat Lambat / Lemot</option>
+              <option value="Tidak Bisa Konek WiFi / No Internet">Tersambung WiFi tapi "No Internet Access"</option>
+              <option value="Kabel FO Terputus / Tertimpa">Kabel FO Terputus / Tertimpa Pohon</option>
+              <option value="Permintaan Ganti Password WiFi">Permintaan Ganti Nama/Password WiFi</option>
+              <option value="Lainnya">Kendala Lainnya</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Jelaskan Kendala Anda</label>
+            <textarea id="ticket-desc" class="form-control" rows="3" required placeholder="Contoh: Lampu modem merah sejak jam 10 pagi..."></textarea>
+          </div>
+          <button type="submit" class="btn btn-warning" style="width: 100%; padding: 10px; font-weight: 700;">
+            📨 Kirim Laporan Gangguan ke Teknisi
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div style="text-align: center; margin-top: 36px; font-size: 12px; color: var(--gray-400);">
+      &copy; 2026 Tagihan Wifi Proxy.net. Seluruh Hak Cipta Dilindungi.<br>
+      Layanan Jaringan Internet & RT-RW Net Mandiri.
+    </div>
+  </div>
+
+  <!-- MODAL PANDUAN PASANG APLIKASI DI HP -->
+  <div class="modal-backdrop" id="modal-install-guide">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>📲 Cara Pasang Aplikasi Ini di Layar HP</h3>
+        <button class="btn-close" onclick="closeModal('modal-install-guide')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="text-align: center; margin-bottom: 16px;">
+          <div class="brand-icon" style="margin: 0 auto 10px auto;">📡</div>
+          <h4 style="font-size: 16px; font-weight: 700;">Tagihan Wifi Proxy.net</h4>
+          <p style="font-size: 12px; color: var(--gray-500);">Pasang aplikasi ke layar HP Anda (Android & iPhone)</p>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 12px;">
+          <strong style="color: #2563eb; font-size: 13.5px; display: block; margin-bottom: 6px;">🤖 Untuk HP Android (Google Chrome):</strong>
+          <ol style="margin-left: 20px; font-size: 13px; color: var(--gray-700); line-height: 1.6;">
+            <li>Tekan tombol titik tiga <strong>(⋮)</strong> di pojok kanan atas browser Chrome HP Anda.</li>
+            <li>Pilih menu <strong>"Install aplikasi"</strong> atau <strong>"Tambahkan ke Layar Utama"</strong>.</li>
+            <li>Klik <strong>Install</strong>. Ikon aplikasi langsung muncul di menu HP Anda!</li>
+          </ol>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); padding: 14px;">
+          <strong style="color: #0284c7; font-size: 13.5px; display: block; margin-bottom: 6px;">🍏 Untuk iPhone / iPad (Safari):</strong>
+          <ol style="margin-left: 20px; font-size: 13px; color: var(--gray-700); line-height: 1.6;">
+            <li>Tekan tombol <strong>Bagikan / Share</strong> (ikon kotak dengan tanda panah ke atas di bawah layar).</li>
+            <li>Gulir ke bawah dan pilih <strong>"Tambahkan ke Layar Utama" (Add to Home Screen)</strong>.</li>
+            <li>Tekan <strong>Tambah</strong> di pojok kanan atas.</li>
+          </ol>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" style="width: 100%;" onclick="closeModal('modal-install-guide')">
+          Mengerti, Saya Akan Pasang
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/portal.js"></script>
+</body>
+</html>
+

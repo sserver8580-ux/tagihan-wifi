@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="100" fill="#2563eb"/>
+  <circle cx="256" cy="256" r="180" fill="#1d4ed8"/>
+  <path d="M160 350 A140 140 0 0 1 352 350" fill="none" stroke="#ffffff" stroke-width="32" stroke-linecap="round"/>
+  <path d="M195 385 A90 90 0 0 1 317 385" fill="none" stroke="#38bdf8" stroke-width="28" stroke-linecap="round"/>
+  <circle cx="256" cy="415" r="24" fill="#ffffff"/>
+  <text x="256" y="180" font-family="sans-serif" font-size="64" font-weight="900" fill="#ffffff" text-anchor="middle">PROXY</text>
+  <text x="256" y="230" font-family="sans-serif" font-size="30" font-weight="700" fill="#bae6fd" text-anchor="middle">TAGIHAN WIFI</text>
+</svg>

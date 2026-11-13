@@ -1,0 +1,19 @@
+{
+  "name": "tagihan-wifi-proxynet",
+  "version": "1.0.0",
+  "description": "Sistem Informasi Manajemen Tagihan WiFi & RT-RW Net - Tagihan Wifi Proxy.net",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "wifi-billing",
+    "isp",
+    "rtrw-net",
+    "mikrotik",
+    "invoice"
+  ],
+  "author": "Tagihan Wifi Proxy.net",
+  "license": "ISC"
+}

@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: tagihan-wifi-proxynet
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: ""
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+

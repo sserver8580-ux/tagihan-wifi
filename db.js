@@ -212,76 +212,178 @@ function initDatabase() {
     `).run('admin', hash, salt, 'Administrator Utama', 'admin', '081234567890');
   }
 
-  // Cek apakah ada data paket default
-  const checkPackages = db.prepare('SELECT COUNT(*) as count FROM packages').get();
-  if (checkPackages.count === 0) {
-    const insertPackage = db.prepare('INSERT INTO packages (name, speed, price, description) VALUES (?, ?, ?, ?)');
-    insertPackage.run('Paket Hemat Rumah', '10 Mbps', 100000, 'Cocok untuk browsing santai dan media sosial keluarga kecil');
-    insertPackage.run('Paket Keluarga Ceria', '20 Mbps', 150000, 'Streaming Full HD lancar dan game online bebas lag');
-    insertPackage.run('Paket Bisnis & Gamer', '50 Mbps', 250000, 'Prioritas bandwidth tinggi untuk kantor, wfh, dan streamer');
-    insertPackage.run('Paket Ultra Proxy Pro', '100 Mbps', 400000, 'Kecepatan tanpa batas untuk kebutuhan kapasitas besar');
-  }
+  // Cek apakah database sudah pernah di-seed sebelumnya
+  const checkSeeded = db.prepare('SELECT value FROM settings WHERE key = ?').get('system_seeded');
+  
+  if (!checkSeeded) {
+    // Inisialisasi Paket Default HANYA saat pertama kali aplikasi dibuat
+    const checkPackages = db.prepare('SELECT COUNT(*) as count FROM packages').get();
+    if (checkPackages.count === 0) {
+      const insertPackage = db.prepare('INSERT INTO packages (name, speed, price, description) VALUES (?, ?, ?, ?)');
+      insertPackage.run('Paket Hemat Rumah', '10 Mbps', 100000, 'Cocok untuk browsing santai dan media sosial keluarga kecil');
+      insertPackage.run('Paket Keluarga Ceria', '20 Mbps', 150000, 'Streaming Full HD lancar dan game online bebas lag');
+      insertPackage.run('Paket Bisnis & Gamer', '50 Mbps', 250000, 'Prioritas bandwidth tinggi untuk kantor, wfh, dan streamer');
+      insertPackage.run('Paket Ultra Proxy Pro', '100 Mbps', 400000, 'Kecepatan tanpa batas untuk kebutuhan kapasitas besar');
+    }
 
-  // Cek data sampel pelanggan jika belum ada
-  const checkCustomers = db.prepare('SELECT COUNT(*) as count FROM customers').get();
-  if (checkCustomers.count === 0) {
-    const insertCustomer = db.prepare(`
-      INSERT INTO customers (customer_code, name, phone, email, address, package_id, ip_address, pppoe_user, pppoe_password, installation_date, due_day, status, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    // Inisialisasi Pelanggan Default HANYA saat pertama kali aplikasi dibuat
+    const checkCustomers = db.prepare('SELECT COUNT(*) as count FROM customers').get();
+    if (checkCustomers.count === 0) {
+      const insertCustomer = db.prepare(`
+        INSERT INTO customers (customer_code, name, phone, email, address, package_id, ip_address, pppoe_user, pppoe_password, installation_date, due_day, status, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
 
-    insertCustomer.run('PXY-001', 'Budi Santoso', '081234567891', 'budi@gmail.com', 'Jl. Melati No. 12 RT 02/03', 2, '192.168.10.11', 'budi_pxy', 'budi123', '2026-01-10', 10, 'active', 'Router ZTE F609');
-    insertCustomer.run('PXY-002', 'Siti Rahmawati', '081234567892', 'siti@gmail.com', 'Jl. Mawar No. 45 RT 01/02', 1, '192.168.10.12', 'siti_pxy', 'siti123', '2026-02-15', 15, 'active', 'Router Huawei HG8245H');
-    insertCustomer.run('PXY-003', 'Hendra Wijaya', '081234567893', 'hendra@gmail.com', 'Ruko Sentra Bisnis Blok B-3', 3, '192.168.10.13', 'hendra_pxy', 'hendra123', '2026-03-01', 5, 'active', 'Router Mikrotik hEX');
-    insertCustomer.run('PXY-004', 'Ahmad Dani', '081234567894', 'dani@gmail.com', 'Jl. Kenanga No. 8', 2, '192.168.10.14', 'dani_pxy', 'dani123', '2026-03-12', 10, 'isolated', 'Menunggak 1 bulan, status isolir');
+      insertCustomer.run('PXY-001', 'Budi Santoso', '081234567891', 'budi@gmail.com', 'Jl. Melati No. 12 RT 02/03', 2, '192.168.10.11', 'budi_pxy', 'budi123', '2026-01-10', 10, 'active', 'Router ZTE F609');
+      insertCustomer.run('PXY-002', 'Siti Rahmawati', '081234567892', 'siti@gmail.com', 'Jl. Mawar No. 45 RT 01/02', 1, '192.168.10.12', 'siti_pxy', 'siti123', '2026-02-15', 15, 'active', 'Router Huawei HG8245H');
+      insertCustomer.run('PXY-003', 'Hendra Wijaya', '081234567893', 'hendra@gmail.com', 'Ruko Sentra Bisnis Blok B-3', 3, '192.168.10.13', 'hendra_pxy', 'hendra123', '2026-03-01', 5, 'active', 'Router Mikrotik hEX');
+      insertCustomer.run('PXY-004', 'Ahmad Dani', '081234567894', 'dani@gmail.com', 'Jl. Kenanga No. 8', 2, '192.168.10.14', 'dani_pxy', 'dani123', '2026-03-12', 10, 'isolated', 'Menunggak 1 bulan, status isolir');
 
-    // Generate sampel invoice bulan ini (Nov 2026)
-    const insertInvoice = db.prepare(`
-      INSERT INTO invoices (invoice_number, customer_id, package_id, package_name, amount, discount, fine, total_amount, period_month, period_year, due_date, status, payment_method, paid_at, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+      // Generate sampel invoice bulan ini (Nov 2026)
+      const insertInvoice = db.prepare(`
+        INSERT INTO invoices (invoice_number, customer_id, package_id, package_name, amount, discount, fine, total_amount, period_month, period_year, due_date, status, payment_method, paid_at, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
 
-    insertInvoice.run('INV/202611/PXY001', 1, 2, 'Paket Keluarga Ceria (20 Mbps)', 150000, 0, 0, 150000, 11, 2026, '2026-11-10', 'paid', 'Transfer BCA', '2026-11-08 09:30:00', 'Lunas tepat waktu');
-    insertInvoice.run('INV/202611/PXY002', 2, 1, 'Paket Hemat Rumah (10 Mbps)', 100000, 0, 0, 100000, 11, 2026, '2026-11-15', 'unpaid', null, null, 'Jatuh tempo 15 Nov');
-    insertInvoice.run('INV/202611/PXY003', 3, 3, 'Paket Bisnis & Gamer (50 Mbps)', 250000, 0, 0, 250000, 11, 2026, '2026-11-05', 'paid', 'QRIS', '2026-11-04 14:15:00', 'Lunas');
-    insertInvoice.run('INV/202611/PXY004', 4, 2, 'Paket Keluarga Ceria (20 Mbps)', 150000, 0, 10000, 160000, 11, 2026, '2026-11-10', 'unpaid', null, null, 'Terlambat + denda Rp 10.000');
+      insertInvoice.run('INV/202611/PXY001', 1, 2, 'Paket Keluarga Ceria (20 Mbps)', 150000, 0, 0, 150000, 11, 2026, '2026-11-10', 'paid', 'Transfer BCA', '2026-11-08 09:30:00', 'Lunas tepat waktu');
+      insertInvoice.run('INV/202611/PXY002', 2, 1, 'Paket Hemat Rumah (10 Mbps)', 100000, 0, 0, 100000, 11, 2026, '2026-11-15', 'unpaid', null, null, 'Jatuh tempo 15 Nov');
+      insertInvoice.run('INV/202611/PXY003', 3, 3, 'Paket Bisnis & Gamer (50 Mbps)', 250000, 0, 0, 250000, 11, 2026, '2026-11-05', 'paid', 'QRIS', '2026-11-04 14:15:00', 'Lunas');
+      insertInvoice.run('INV/202611/PXY004', 4, 2, 'Paket Keluarga Ceria (20 Mbps)', 150000, 0, 10000, 160000, 11, 2026, '2026-11-10', 'unpaid', null, null, 'Terlambat + denda Rp 10.000');
 
-    // Catat pembayaran sampel
-    db.prepare(`
-      INSERT INTO payments (invoice_id, amount_paid, payment_method, cashier_name, payment_date, notes)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(1, 150000, 'Transfer BCA', 'admin', '2026-11-08 09:30:00', 'Bukti transfer valid');
+      // Catat pembayaran sampel
+      db.prepare(`
+        INSERT INTO payments (invoice_id, amount_paid, payment_method, cashier_name, payment_date, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(1, 150000, 'Transfer BCA', 'admin', '2026-11-08 09:30:00', 'Bukti transfer valid');
 
-    db.prepare(`
-      INSERT INTO payments (invoice_id, amount_paid, payment_method, cashier_name, payment_date, notes)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(3, 250000, 'QRIS', 'admin', '2026-11-04 14:15:00', 'Auto QRIS Settlement');
+      db.prepare(`
+        INSERT INTO payments (invoice_id, amount_paid, payment_method, cashier_name, payment_date, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(3, 250000, 'QRIS', 'admin', '2026-11-04 14:15:00', 'Auto QRIS Settlement');
 
-    // Catat pengeluaran sampel
-    db.prepare(`
-      INSERT INTO expenses (category, amount, description, expense_date, created_by)
-      VALUES (?, ?, ?, ?, ?)
-    `).run('Bandwidth ISP Utama', 1200000, 'Langganan Dedicated Uplink 200 Mbps', '2026-11-01', 'admin');
+      // Catat pengeluaran sampel
+      db.prepare(`
+        INSERT INTO expenses (category, amount, description, expense_date, created_by)
+        VALUES (?, ?, ?, ?, ?)
+      `).run('Bandwidth ISP Utama', 1200000, 'Langganan Dedicated Uplink 200 Mbps', '2026-11-01', 'admin');
 
-    db.prepare(`
-      INSERT INTO expenses (category, amount, description, expense_date, created_by)
-      VALUES (?, ?, ?, ?, ?)
-    `).run('Pemeliharaan Kabel FO', 150000, 'Penggantian dropcore putus di RW 02', '2026-11-05', 'admin');
+      db.prepare(`
+        INSERT INTO expenses (category, amount, description, expense_date, created_by)
+        VALUES (?, ?, ?, ?, ?)
+      `).run('Pemeliharaan Kabel FO', 150000, 'Penggantian dropcore putus di RW 02', '2026-11-05', 'admin');
 
-    // Sampel tiket gangguan
-    db.prepare(`
-      INSERT INTO tickets (ticket_number, customer_id, issue_type, description, priority, status, technician_notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run('TCK-202611-001', 2, 'Lampu PON Merah', 'Lampu indikator modem LOS berkedip merah sejak pagi', 'high', 'open', 'Menunggu teknisi cek jalur ODP-03');
+      // Sampel tiket gangguan
+      db.prepare(`
+        INSERT INTO tickets (ticket_number, customer_id, issue_type, description, priority, status, technician_notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run('TCK-202611-001', 2, 'Lampu PON Merah', 'Lampu indikator modem LOS berkedip merah sejak pagi', 'high', 'open', 'Menunggu teknisi cek jalur ODP-03');
+    }
+
+    // Tandai bahwa database telah di-seed sehingga jika user menghapus data, data TIDAK AKAN muncul lagi!
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('system_seeded', '1')").run();
   }
 }
 
 // Inisialisasi DB saat modul dimuat
 initDatabase();
 
+// Helper untuk ekspor seluruh data ke objek JSON
+function exportAllData() {
+  return {
+    version: 1,
+    exported_at: new Date().toISOString(),
+    settings: db.prepare('SELECT key, value FROM settings').all(),
+    packages: db.prepare('SELECT * FROM packages').all(),
+    customers: db.prepare('SELECT * FROM customers').all(),
+    invoices: db.prepare('SELECT * FROM invoices').all(),
+    payments: db.prepare('SELECT * FROM payments').all(),
+    expenses: db.prepare('SELECT * FROM expenses').all(),
+    tickets: db.prepare('SELECT * FROM tickets').all(),
+    users: db.prepare('SELECT id, username, password_hash, salt, full_name, role, phone, created_at FROM users').all()
+  };
+}
+
+// Helper untuk impor seluruh data dari objek JSON
+function importAllData(data) {
+  if (!data) return false;
+
+  // Impor Settings
+  if (Array.isArray(data.settings)) {
+    const ins = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+    for (const s of data.settings) {
+      if (s.key && s.value !== undefined) ins.run(s.key, String(s.value));
+    }
+  }
+
+  // Impor Packages
+  if (Array.isArray(data.packages)) {
+    db.exec('DELETE FROM packages');
+    const ins = db.prepare('INSERT INTO packages (id, name, speed, price, description, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    for (const p of data.packages) {
+      ins.run(p.id, p.name, p.speed, p.price, p.description || '', p.is_active ?? 1, p.created_at || new Date().toISOString());
+    }
+  }
+
+  // Impor Customers
+  if (Array.isArray(data.customers)) {
+    db.exec('DELETE FROM customers');
+    const ins = db.prepare(`
+      INSERT INTO customers (id, customer_code, name, phone, email, address, package_id, ip_address, pppoe_user, pppoe_password, installation_date, due_day, status, notes, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const c of data.customers) {
+      ins.run(c.id, c.customer_code, c.name, c.phone, c.email || '', c.address, c.package_id, c.ip_address || '', c.pppoe_user || '', c.pppoe_password || '', c.installation_date || '', c.due_day || 10, c.status || 'active', c.notes || '', c.created_at || new Date().toISOString());
+    }
+  }
+
+  // Impor Invoices
+  if (Array.isArray(data.invoices)) {
+    db.exec('DELETE FROM invoices');
+    const ins = db.prepare(`
+      INSERT INTO invoices (id, invoice_number, customer_id, package_id, package_name, amount, discount, fine, total_amount, period_month, period_year, due_date, status, payment_method, paid_at, notes, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const i of data.invoices) {
+      ins.run(i.id, i.invoice_number, i.customer_id, i.package_id, i.package_name, i.amount, i.discount || 0, i.fine || 0, i.total_amount, i.period_month, i.period_year, i.due_date, i.status || 'unpaid', i.payment_method || null, i.paid_at || null, i.notes || '', i.created_at || new Date().toISOString());
+    }
+  }
+
+  // Impor Payments
+  if (Array.isArray(data.payments)) {
+    db.exec('DELETE FROM payments');
+    const ins = db.prepare('INSERT INTO payments (id, invoice_id, amount_paid, payment_method, cashier_name, payment_date, notes) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    for (const p of data.payments) {
+      ins.run(p.id, p.invoice_id, p.amount_paid, p.payment_method, p.cashier_name, p.payment_date || new Date().toISOString(), p.notes || '');
+    }
+  }
+
+  // Impor Expenses
+  if (Array.isArray(data.expenses)) {
+    db.exec('DELETE FROM expenses');
+    const ins = db.prepare('INSERT INTO expenses (id, category, amount, description, expense_date, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    for (const e of data.expenses) {
+      ins.run(e.id, e.category, e.amount, e.description || '', e.expense_date, e.created_by || 'admin', e.created_at || new Date().toISOString());
+    }
+  }
+
+  // Impor Tickets
+  if (Array.isArray(data.tickets)) {
+    db.exec('DELETE FROM tickets');
+    const ins = db.prepare('INSERT INTO tickets (id, ticket_number, customer_id, issue_type, description, priority, status, technician_notes, reported_at, resolved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    for (const t of data.tickets) {
+      ins.run(t.id, t.ticket_number, t.customer_id, t.issue_type, t.description, t.priority || 'normal', t.status || 'open', t.technician_notes || '', t.reported_at || new Date().toISOString(), t.resolved_at || null);
+    }
+  }
+
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('system_seeded', '1')").run();
+  return true;
+}
+
 module.exports = {
   db,
   hashPassword,
-  verifyPassword
+  verifyPassword,
+  exportAllData,
+  importAllData
 };
 

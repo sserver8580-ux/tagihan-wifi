@@ -35,8 +35,14 @@ async function apiFetch(endpoint, options = {}) {
     ...options.headers
   };
 
+  // Anti-cache untuk GET request
+  let finalEndpoint = endpoint;
+  if (!options.method || options.method === 'GET') {
+    finalEndpoint = endpoint.includes('?') ? `${endpoint}&_t=${Date.now()}` : `${endpoint}?_t=${Date.now()}`;
+  }
+
   try {
-    const res = await fetch(endpoint, { credentials: 'omit', ...options, headers });
+    const res = await fetch(finalEndpoint, { credentials: 'omit', cache: 'no-store', ...options, headers });
     if (res.status === 401 && endpoint !== '/api/auth/login') {
       localStorage.removeItem('token');
       showLoginView();
@@ -136,7 +142,9 @@ function showAppLayout() {
 async function loadInitialData() {
   await loadSettings();
   await loadPackages();
+  await loadCustomers();
   await loadDashboard();
+  syncFullStateToServer();
 }
 
 // 1. AUTH LOGIN & LOGOUT
@@ -359,11 +367,24 @@ async function loadDashboard() {
 
 // 5. PACKAGES
 async function loadPackages() {
+  // Ambil dari cache localStorage terlebih dahulu untuk render instan
+  const saved = localStorage.getItem('wifi_cached_packages');
+  if (saved) {
+    try {
+      cachedPackages = JSON.parse(saved);
+      renderPackages();
+      updatePackageSelectDropdown();
+    } catch (e) {}
+  }
+
   try {
     const res = await apiFetch('/api/packages');
-    cachedPackages = res.packages;
-    renderPackages();
-    updatePackageSelectDropdown();
+    if (res && res.packages) {
+      cachedPackages = res.packages;
+      localStorage.setItem('wifi_cached_packages', JSON.stringify(cachedPackages));
+      renderPackages();
+      updatePackageSelectDropdown();
+    }
   } catch (err) {}
 }
 
@@ -432,23 +453,47 @@ async function savePackage(e) {
 
   try {
     if (id) {
-      await apiFetch(`/api/packages/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      const pkgId = parseInt(id);
+      const idx = cachedPackages.findIndex(p => p.id === pkgId);
+      if (idx !== -1) {
+        cachedPackages[idx] = { ...cachedPackages[idx], ...payload, id: pkgId };
+      }
       showToast('Paket berhasil diperbarui', 'success');
+      closeModal('modal-package');
+      renderPackages();
+      updatePackageSelectDropdown();
+      localStorage.setItem('wifi_cached_packages', JSON.stringify(cachedPackages));
+
+      await apiFetch(`/api/packages/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
     } else {
-      await apiFetch('/api/packages', { method: 'POST', body: JSON.stringify(payload) });
+      const tempId = Date.now();
+      const newPkg = { id: tempId, ...payload, is_active: 1 };
+      cachedPackages.unshift(newPkg);
       showToast('Paket baru berhasil ditambahkan', 'success');
+      closeModal('modal-package');
+      renderPackages();
+      updatePackageSelectDropdown();
+      localStorage.setItem('wifi_cached_packages', JSON.stringify(cachedPackages));
+
+      const res = await apiFetch('/api/packages', { method: 'POST', body: JSON.stringify(payload) });
+      if (res && res.id) newPkg.id = res.id;
     }
-    closeModal('modal-package');
-    await loadPackages();
+    localStorage.setItem('wifi_cached_packages', JSON.stringify(cachedPackages));
+    syncFullStateToServer();
   } catch (err) {}
 }
 
 async function deletePackage(id) {
   if (confirm('Yakin ingin menghapus paket ini?')) {
     try {
-      await apiFetch(`/api/packages/${id}`, { method: 'DELETE' });
+      cachedPackages = cachedPackages.filter(p => p.id !== id);
+      localStorage.setItem('wifi_cached_packages', JSON.stringify(cachedPackages));
+      renderPackages();
+      updatePackageSelectDropdown();
       showToast('Paket berhasil dihapus', 'success');
-      await loadPackages();
+
+      await apiFetch(`/api/packages/${id}`, { method: 'DELETE' });
+      syncFullStateToServer();
     } catch (err) {}
   }
 }
@@ -460,66 +505,99 @@ async function loadCustomers() {
   const search = document.getElementById('filter-customer-search')?.value || '';
   const status = document.getElementById('filter-customer-status')?.value || 'all';
 
+  // Ambil dari cache localStorage terlebih dahulu untuk tampilan instan tanpa delay
+  const saved = localStorage.getItem('wifi_cached_customers');
+  if (saved && cachedCustomers.length === 0) {
+    try {
+      cachedCustomers = JSON.parse(saved);
+      renderCustomerTable(search, status);
+    } catch (e) {}
+  }
+
   try {
     const res = await apiFetch(`/api/customers?search=${encodeURIComponent(search)}&status=${status}`);
-    cachedCustomers = res.customers || [];
-    const tbody = document.getElementById('table-customers');
-
-    if (!res.customers || res.customers.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--gray-400); padding: 30px;">Tidak ada data pelanggan yang sesuai.</td></tr>`;
-      return;
+    if (res && res.customers) {
+      cachedCustomers = res.customers;
+      localStorage.setItem('wifi_cached_customers', JSON.stringify(cachedCustomers));
+      renderCustomerTable(search, status);
     }
+  } catch (err) {
+    renderCustomerTable(search, status);
+  }
+}
 
-    tbody.innerHTML = res.customers.map(c => `
-      <tr>
-        <td>
-          <strong style="color: var(--primary);">${c.customer_code}</strong>
-        </td>
-        <td>
-          <div style="font-weight: 700; color: var(--gray-900); cursor: pointer;" onclick="viewCustomerDetail(${c.id})" title="Klik untuk lihat riwayat & detail">
-            ${c.name} 🔍
-          </div>
-          <div style="font-size: 12px; color: var(--gray-500); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
-            <span>📱 ${c.phone}</span>
-            <a href="https://wa.me/${c.phone.replace(/^0/, '62').replace(/[^0-9]/g, '')}" target="_blank" style="color: #25d366; text-decoration: none;" title="Chat WhatsApp">
-              💬
-            </a>
-          </div>
-        </td>
-        <td style="max-width: 180px; font-size: 12.5px; color: var(--gray-600);">${c.address}</td>
-        <td>
-          <strong>${c.package_name || '-'}</strong>
-          <div style="font-size: 11.5px; color: #10b981;">${c.package_speed || ''} (${formatRupiah(c.package_price || 0)})</div>
-        </td>
-        <td style="font-size: 12px; font-family: monospace;">
-          <div>IP: ${c.ip_address || '-'}</div>
-          <div>User: ${c.pppoe_user || '-'}</div>
-        </td>
-        <td>Tgl ${c.due_day}</td>
-        <td>
-          <span class="badge badge-${c.status}">
-            ${c.status === 'active' ? '🟢 Aktif' : c.status === 'isolated' ? '🔴 Terisolir' : '⚪ Nonaktif'}
-          </span>
-        </td>
-        <td>
-          <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-            <button class="btn btn-primary btn-sm" onclick="viewCustomerDetail(${c.id})" title="Lihat Detail & Riwayat Tagihan">👁️</button>
-            <button class="btn btn-secondary btn-sm" onclick="editCustomer(${c.id})" title="Edit Data">✏️</button>
-            <button class="btn btn-${c.status === 'active' ? 'warning' : 'success'} btn-sm" onclick="toggleCustomerStatus(${c.id})" title="${c.status === 'active' ? 'Isolir' : 'Aktifkan'}">
-              ${c.status === 'active' ? '🔒 Isolir' : '🔓 Aktif'}
-            </button>
-            <button class="btn btn-danger btn-sm" onclick="deleteCustomer(${c.id})" title="Hapus">🗑️</button>
-          </div>
-        </td>
-      </tr>
-    `).join('');
-  } catch (err) {}
+function renderCustomerTable(search = '', status = 'all') {
+  const tbody = document.getElementById('table-customers');
+  if (!tbody) return;
+
+  let filtered = cachedCustomers;
+  if (search) {
+    const q = search.toLowerCase();
+    filtered = filtered.filter(c => 
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.customer_code && c.customer_code.toLowerCase().includes(q)) ||
+      (c.phone && c.phone.includes(q)) ||
+      (c.address && c.address.toLowerCase().includes(q)) ||
+      (c.pppoe_user && c.pppoe_user.toLowerCase().includes(q))
+    );
+  }
+  if (status && status !== 'all') {
+    filtered = filtered.filter(c => c.status === status);
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--gray-400); padding: 30px;">Tidak ada data pelanggan yang sesuai.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(c => `
+    <tr>
+      <td>
+        <strong style="color: var(--primary);">${c.customer_code}</strong>
+      </td>
+      <td>
+        <div style="font-weight: 700; color: var(--gray-900); cursor: pointer;" onclick="viewCustomerDetail(${c.id})" title="Klik untuk lihat riwayat & detail">
+          ${c.name} 🔍
+        </div>
+        <div style="font-size: 12px; color: var(--gray-500); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+          <span>📱 ${c.phone}</span>
+          <a href="https://wa.me/${c.phone.replace(/^0/, '62').replace(/[^0-9]/g, '')}" target="_blank" style="color: #25d366; text-decoration: none;" title="Chat WhatsApp">
+            💬
+          </a>
+        </div>
+      </td>
+      <td style="max-width: 180px; font-size: 12.5px; color: var(--gray-600);">${c.address}</td>
+      <td>
+        <strong>${c.package_name || '-'}</strong>
+        <div style="font-size: 11.5px; color: #10b981;">${c.package_speed || ''} (${formatRupiah(c.package_price || 0)})</div>
+      </td>
+      <td style="font-size: 12px; font-family: monospace;">
+        <div>IP: ${c.ip_address || '-'}</div>
+        <div>User: ${c.pppoe_user || '-'}</div>
+      </td>
+      <td>Tgl ${c.due_day}</td>
+      <td>
+        <span class="badge badge-${c.status}">
+          ${c.status === 'active' ? '🟢 Aktif' : c.status === 'isolated' ? '🔴 Terisolir' : '⚪ Nonaktif'}
+        </span>
+      </td>
+      <td>
+        <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+          <button class="btn btn-primary btn-sm" onclick="viewCustomerDetail(${c.id})" title="Lihat Detail & Riwayat Tagihan">👁️</button>
+          <button class="btn btn-secondary btn-sm" onclick="editCustomer(${c.id})" title="Edit Data">✏️</button>
+          <button class="btn btn-${c.status === 'active' ? 'warning' : 'success'} btn-sm" onclick="toggleCustomerStatus(${c.id})" title="${c.status === 'active' ? 'Isolir' : 'Aktifkan'}">
+            ${c.status === 'active' ? '🔒 Isolir' : '🔓 Aktif'}
+          </button>
+          <button class="btn btn-danger btn-sm" onclick="deleteCustomer(${c.id})" title="Hapus">🗑️</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
 }
 
 async function viewCustomerDetail(id) {
   try {
-    const res = await apiFetch(`/api/customers?search=`);
-    const cust = res.customers.find(c => c.id === id);
+    const cust = cachedCustomers.find(c => c.id === id);
     if (!cust) return;
 
     document.getElementById('cust-det-title').innerText = `Detail Pelanggan: ${cust.name} (${cust.customer_code})`;
@@ -576,8 +654,7 @@ function openCustomerModal() {
 
 async function editCustomer(id) {
   try {
-    const res = await apiFetch(`/api/customers?search=`);
-    const cust = res.customers.find(c => c.id === id);
+    const cust = cachedCustomers.find(c => c.id === id);
     if (!cust) return;
 
     document.getElementById('cust-id').value = cust.id;
@@ -602,13 +679,20 @@ async function editCustomer(id) {
 async function saveCustomer(e) {
   e.preventDefault();
   const id = document.getElementById('cust-id').value;
+  let code = document.getElementById('cust-code').value.trim();
+  if (!code) {
+    code = `PXY-${String(cachedCustomers.length + 1).padStart(3, '0')}`;
+  }
+  const pkgId = parseInt(document.getElementById('cust-package').value);
+  const selectedPkg = cachedPackages.find(p => p.id === pkgId);
+
   const payload = {
-    customer_code: document.getElementById('cust-code').value.trim(),
+    customer_code: code,
     name: document.getElementById('cust-name').value.trim(),
     phone: document.getElementById('cust-phone').value.trim(),
     email: document.getElementById('cust-email').value.trim(),
     address: document.getElementById('cust-address').value.trim(),
-    package_id: parseInt(document.getElementById('cust-package').value),
+    package_id: pkgId,
     due_day: parseInt(document.getElementById('cust-due-day').value) || 10,
     ip_address: document.getElementById('cust-ip').value.trim(),
     pppoe_user: document.getElementById('cust-pppoe-user').value.trim(),
@@ -619,22 +703,59 @@ async function saveCustomer(e) {
 
   try {
     if (id) {
-      await apiFetch(`/api/customers/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      const custId = parseInt(id);
+      const idx = cachedCustomers.findIndex(c => c.id === custId);
+      if (idx !== -1) {
+        cachedCustomers[idx] = {
+          ...cachedCustomers[idx],
+          ...payload,
+          id: custId,
+          package_name: selectedPkg ? selectedPkg.name : '',
+          package_speed: selectedPkg ? selectedPkg.speed : '',
+          package_price: selectedPkg ? selectedPkg.price : 0
+        };
+      }
       showToast('Data pelanggan berhasil diperbarui', 'success');
+      closeModal('modal-customer');
+      renderCustomerTable();
+      localStorage.setItem('wifi_cached_customers', JSON.stringify(cachedCustomers));
+
+      await apiFetch(`/api/customers/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
     } else {
-      await apiFetch('/api/customers', { method: 'POST', body: JSON.stringify(payload) });
+      const tempId = Date.now();
+      const newCust = {
+        id: tempId,
+        ...payload,
+        package_name: selectedPkg ? selectedPkg.name : '',
+        package_speed: selectedPkg ? selectedPkg.speed : '',
+        package_price: selectedPkg ? selectedPkg.price : 0
+      };
+      cachedCustomers.unshift(newCust);
       showToast('Pelanggan baru berhasil didaftarkan!', 'success');
+      closeModal('modal-customer');
+      renderCustomerTable();
+      localStorage.setItem('wifi_cached_customers', JSON.stringify(cachedCustomers));
+
+      const res = await apiFetch('/api/customers', { method: 'POST', body: JSON.stringify(payload) });
+      if (res && res.id) newCust.id = res.id;
     }
-    closeModal('modal-customer');
-    await loadCustomers();
+    localStorage.setItem('wifi_cached_customers', JSON.stringify(cachedCustomers));
+    syncFullStateToServer();
+    await loadDashboard();
   } catch (err) {}
 }
 
 async function toggleCustomerStatus(id) {
   try {
+    const cust = cachedCustomers.find(c => c.id === id);
+    if (cust) {
+      cust.status = (cust.status === 'active' ? 'isolated' : 'active');
+      localStorage.setItem('wifi_cached_customers', JSON.stringify(cachedCustomers));
+      renderCustomerTable();
+    }
     const res = await apiFetch(`/api/customers/${id}/toggle-status`, { method: 'POST' });
     showToast(res.message, 'success');
-    await loadCustomers();
+    syncFullStateToServer();
     await loadDashboard();
   } catch (err) {}
 }
@@ -642,12 +763,88 @@ async function toggleCustomerStatus(id) {
 async function deleteCustomer(id) {
   if (confirm('PERINGATAN: Menghapus pelanggan akan menghapus seluruh data tagihannya. Lanjutkan?')) {
     try {
-      await apiFetch(`/api/customers/${id}`, { method: 'DELETE' });
+      cachedCustomers = cachedCustomers.filter(c => c.id !== id);
+      localStorage.setItem('wifi_cached_customers', JSON.stringify(cachedCustomers));
+      renderCustomerTable();
       showToast('Pelanggan berhasil dihapus', 'success');
-      await loadCustomers();
+
+      await apiFetch(`/api/customers/${id}`, { method: 'DELETE' });
+      syncFullStateToServer();
       await loadDashboard();
     } catch (err) {}
   }
+}
+
+// Background Sync ke Server
+async function syncFullStateToServer() {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+  try {
+    const payload = {
+      data: {
+        packages: cachedPackages,
+        customers: cachedCustomers,
+        settings: Object.entries(currentSettings || {}).map(([key, value]) => ({ key, value }))
+      }
+    };
+    await fetch(`/api/sync?_t=${Date.now()}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch (e) {
+    console.warn('Background sync status:', e);
+  }
+}
+
+// Backup & Restore Database
+function exportDataBackup() {
+  const data = {
+    export_date: new Date().toISOString(),
+    packages: cachedPackages,
+    customers: cachedCustomers,
+    settings: currentSettings
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `backup-tagihan-wifi-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  showToast('File backup database berhasil diunduh!', 'success');
+}
+
+async function importDataBackup(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (evt) => {
+    try {
+      const json = JSON.parse(evt.target.result);
+      if (json.packages && Array.isArray(json.packages)) {
+        cachedPackages = json.packages;
+        localStorage.setItem('wifi_cached_packages', JSON.stringify(cachedPackages));
+        renderPackages();
+        updatePackageSelectDropdown();
+      }
+      if (json.customers && Array.isArray(json.customers)) {
+        cachedCustomers = json.customers;
+        localStorage.setItem('wifi_cached_customers', JSON.stringify(cachedCustomers));
+        renderCustomerTable();
+      }
+      if (json.settings) {
+        currentSettings = { ...currentSettings, ...json.settings };
+      }
+      showToast('Database berhasil dipulihkan dari file backup!', 'success');
+      await syncFullStateToServer();
+      await loadDashboard();
+    } catch (err) {
+      showToast('Gagal memproses file backup: ' + err.message, 'danger');
+    }
+  };
+  reader.readAsText(file);
 }
 
 // 7. INVOICES

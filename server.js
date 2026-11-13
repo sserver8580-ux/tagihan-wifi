@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const url = require('node:url');
 const crypto = require('node:crypto');
-const { db, hashPassword, verifyPassword } = require('./db.js');
+const { db, hashPassword, verifyPassword, exportAllData, importAllData } = require('./db.js');
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'proxy-net-super-secret-key-2026-wifi';
@@ -82,6 +82,10 @@ function parseJsonBody(req) {
 function sendJson(res, statusCode, data) {
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+    'Surrogate-Control': 'no-store',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
@@ -850,26 +854,46 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
-      // 15. BACKUP & EXPORT
+      // 15. BACKUP & SINKRONISASI LENGKAP
+      if (pathname === '/api/sync' && method === 'GET') {
+        const data = exportAllData();
+        return sendJson(res, 200, { success: true, data });
+      }
+
+      if (pathname === '/api/sync' && method === 'POST') {
+        if (!currentUser) return sendJson(res, 401, { success: false, message: 'Akses ditolak' });
+        const body = await parseJsonBody(req);
+        if (body && body.data) {
+          importAllData(body.data);
+          return sendJson(res, 200, { success: true, message: 'Data berhasil disinkronkan ke server' });
+        }
+        return sendJson(res, 400, { success: false, message: 'Format data sinkronisasi tidak valid' });
+      }
+
+      if (pathname === '/api/backup/import-json' && method === 'POST') {
+        if (!currentUser || currentUser.role !== 'admin') {
+          return sendJson(res, 403, { success: false, message: 'Hanya Admin yang dapat memulihkan data' });
+        }
+        const body = await parseJsonBody(req);
+        const success = importAllData(body);
+        if (success) {
+          logActivity(currentUser.username, 'RESTORE_DATA', 'Database berhasil dipulihkan dari file backup JSON');
+          return sendJson(res, 200, { success: true, message: 'Database berhasil dipulihkan secara penuh!' });
+        } else {
+          return sendJson(res, 400, { success: false, message: 'File backup tidak valid' });
+        }
+      }
+
       if (pathname === '/api/backup/export-json' && method === 'GET') {
         if (!currentUser || currentUser.role !== 'admin') {
           return sendJson(res, 403, { success: false, message: 'Hanya Admin yang dapat mengunduh backup' });
         }
 
-        const data = {
-          export_date: new Date().toISOString(),
-          settings: db.prepare('SELECT * FROM settings').all(),
-          packages: db.prepare('SELECT * FROM packages').all(),
-          customers: db.prepare('SELECT * FROM customers').all(),
-          invoices: db.prepare('SELECT * FROM invoices').all(),
-          payments: db.prepare('SELECT * FROM payments').all(),
-          expenses: db.prepare('SELECT * FROM expenses').all(),
-          tickets: db.prepare('SELECT * FROM tickets').all()
-        };
-
+        const data = exportAllData();
         const jsonStr = JSON.stringify(data, null, 2);
         res.writeHead(200, {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store, no-cache',
           'Content-Disposition': `attachment; filename="backup-tagihan-wifi-proxynet-${new Date().toISOString().slice(0, 10)}.json"`
         });
         return res.end(jsonStr);

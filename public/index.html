@@ -544,12 +544,18 @@
 
                 <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                   <div>
-                    <h4 style="font-size: 14px; font-weight: 700;">Backup Database</h4>
-                    <p style="font-size: 12px; color: var(--gray-500);">Unduh data cadangan sistem secara berkala</p>
+                    <h4 style="font-size: 14px; font-weight: 700;">💾 Cadangkan & Pulihkan Database</h4>
+                    <p style="font-size: 12px; color: var(--gray-500);">Data tersimpan aman di browser dan cloud server. Anda dapat mengunduh atau memulihkan data kapan saja.</p>
                   </div>
-                  <a href="/api/backup/export-json" class="btn btn-secondary" download>
-                    📥 Unduh Backup JSON
-                  </a>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-secondary" onclick="exportDataBackup()">
+                      📥 Unduh Backup JSON
+                    </button>
+                    <label class="btn btn-primary" style="margin-bottom: 0; cursor: pointer;">
+                      📤 Pulihkan / Impor JSON
+                      <input type="file" id="file-restore-json" accept=".json" style="display: none;" onchange="importDataBackup(event)">
+                    </label>
+                  </div>
                 </div>
               </form>
             </div>

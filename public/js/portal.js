@@ -74,7 +74,9 @@ async function handleSearch(e) {
   if (!query) return;
 
   try {
-    const res = await fetch(`/api/public/check-bill?query=${encodeURIComponent(query)}`);
+    const res = await fetch(`/api/public/check-bill?query=${encodeURIComponent(query)}&_t=${Date.now()}`, {
+      cache: 'no-store'
+    });
     const data = await res.json();
 
     if (!res.ok) {

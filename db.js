@@ -1,11 +1,29 @@
 // db.js - Database Handler menggunakan Node.js built-in SQLite (DatabaseSync)
-const { DatabaseSync } = require('node:sqlite');
 const path = require('node:path');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
 
-const dbPath = path.join(__dirname, 'database.sqlite');
-const db = new DatabaseSync(dbPath);
+// Di Vercel Serverless, filesystem bersifat read-only kecuali folder /tmp
+const isVercel = Boolean(process.env.VERCEL);
+const dbPath = isVercel ? path.join('/tmp', 'database.sqlite') : path.join(__dirname, 'database.sqlite');
+
+// Salin database awal ke /tmp jika di Vercel
+if (isVercel && !fs.existsSync(dbPath)) {
+  const localDb = path.join(__dirname, 'database.sqlite');
+  if (fs.existsSync(localDb)) {
+    try {
+      fs.copyFileSync(localDb, dbPath);
+    } catch (e) {}
+  }
+}
+
+let db = null;
+try {
+  const { DatabaseSync } = require('node:sqlite');
+  db = new DatabaseSync(dbPath);
+} catch (e) {
+  console.warn('node:sqlite tidak tersedia, menggunakan fallback memory db:', e.message);
+}
 
 // Helper hash password dengan crypto bawaan
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {

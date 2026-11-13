@@ -942,14 +942,18 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`=======================================================`);
-  console.log(`🚀 Aplikasi Tagihan Wifi Proxy.net Berhasil Berjalan!`);
-  console.log(`📡 URL Lokal:   http://localhost:${PORT}`);
-  console.log(`🌐 Domain Target: https://Tagihan.wifi.my.id`);
-  console.log(`🔑 Login Admin Default:`);
-  console.log(`   Username: admin`);
-  console.log(`   Password: admin123`);
-  console.log(`=======================================================`);
-});
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`=======================================================`);
+    console.log(`🚀 Aplikasi Tagihan Wifi Proxy.net Berhasil Berjalan!`);
+    console.log(`📡 URL Lokal:   http://localhost:${PORT}`);
+    console.log(`🌐 Domain Target: https://Tagihan.wifi.my.id`);
+    console.log(`🔑 Login Admin Default:`);
+    console.log(`   Username: admin`);
+    console.log(`   Password: admin123`);
+    console.log(`=======================================================`);
+  });
+}
+
+module.exports = server;
 
